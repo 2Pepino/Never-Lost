@@ -1,6 +1,6 @@
 # Never Lost
 
-A mobile-first web app that helps shoppers find products in physical stores. Build a list, pick a store, and follow an optimized route on a 2D floor plan. The app personalizes search results and alternatives based on your profile, and includes a manager flow for building store floor plans.
+A mobile-first web app that helps shoppers find products in physical stores. Build a list, pick a store, and follow an optimized route on a 2D floor plan. Includes a manager flow for building store floor plans.
 
 **Demo:** [https://github.com/2Pepino/Never-Lost](https://github.com/2Pepino/Never-Lost)
 
@@ -21,28 +21,19 @@ Product catalogs and floor plans are stored on a small **Node.js API** (JSON fil
 
 ## Customer experience
 
-### Home — stores & Chef
+### Home — stores
 
-On the home screen you can:
-
-- **Stores** — browse 5 stores around Ghent (simulated location: Korenmarkt), sorted by distance. Search by name, street or type.
-- **✨ Chef** — a conversational assistant that asks about time, servings, cuisine and ingredients, then suggests recipes and adds the ingredients to your cart. Supports typing and speech input.
+Browse 5 stores around Ghent (simulated location: Korenmarkt), sorted by distance. Search by name, street or type.
 
 ### Cart
 
-Your cart holds:
-
-- Ingredients from the Chef
-- Concrete products you added in a store
-
-You can check items off as you shop, remove items, or search and add products manually. At the bottom, the app suggests which store can supply the most items from your list in one trip.
+Your cart holds products you added from stores or search. Check items off as you shop, remove items, or add more via search. At the bottom, the app suggests which store can supply the most items from your list in one trip.
 
 ### In a store
 
 Open a store to:
 
-- Search and browse products by category
-- See results ranked by your **profile preferences** (brands, diet, departments, price tier)
+- Search and browse products by category (in-stock items first)
 - Open the **floor plan**, tap to set your starting position, and get a walking route along your cart items
 - Check off racks as you visit them — the route and your position update in real time
 - After all product stops: route continues to **checkout** and then **exit**
@@ -51,19 +42,12 @@ Open a store to:
 
 - Add/remove from cart
 - See stock status: on shelf, in warehouse, or out of stock
-- **Out of stock** → personalized alternatives (same category, scored on brand/diet/price) and the same product at other stores
+- **Out of stock** → alternatives in the same category (sorted by price similarity) and the same product at other stores
 - Route to the product on the floor plan when it is on shelf
 
 ### Profile
 
-Under **More / Profile** you can set:
-
-- Personal details (name, email, phone, address)
-- Profile photo (presets or custom upload)
-- Preferences: departments, diet tags, price tier, favourite brands
-- Cashback balance and loyalty info
-
-Guests can use the app but see no personalization.
+Under **More / Profile** you can edit personal details (name, email, phone, address) and choose a profile photo (presets or custom upload). Sign up creates your own account; a demo account is seeded on first load (see below).
 
 ---
 
@@ -97,20 +81,13 @@ Login at `/manage/login`.
 | **Catalog** | Live product list with stock for the manager's store |
 | **Connections** | Configure external API endpoints to sync stock (demo/mock supported) |
 
-Floor plans and connections are persisted in `localStorage` per store.
+Floor plans are saved via the API (`PUT /api/stores/:storeId/floorplan`). API connections for stock sync are stored in `localStorage` per store.
 
 ---
 
-## Personalization
+## Product ranking
 
-The same scoring pattern is used everywhere (`src/lib/personalization.js`):
-
-1. Filter (e.g. in stock, same category)
-2. Score (brand match, diet, department, price tier)
-3. Sort descending
-4. Optional label (“Your brand”, “Fits your budget”, gluten warning)
-
-Logged-in members with preferences get ranked results. Guests get alphabetical / in-stock-first ordering.
+`src/lib/personalization.js` sorts store search by in-stock first, then name. Out-of-stock alternatives use same category and similar price.
 
 ---
 
@@ -198,7 +175,7 @@ On first load a shared demo account is seeded:
 
 | Field | Value |
 |-------|-------|
-| Email | `demo@demo` |
+| Email | `demo@demo.com` |
 | Password | `demo` |
 
 This account can access customer and manager flows depending on how you log in. Create your own account via **Sign up** on the login page.
@@ -211,9 +188,9 @@ This account can access customer and manager flows depending on how you log in. 
 src/
 ├── pages/           # Customer and manager screens
 ├── components/      # UI, floor plan renderer, editor palette
-├── context/         # Global app state (profiles, cart, stock)
-├── data/            # Stores, products, profiles, floor plan types
-├── lib/             # Routing, personalization, security, assistant
+├── context/         # Global app state (account profile, cart, stock)
+├── data/            # Stores, managers, floor plan types, avatar presets
+├── lib/             # Catalog API, routing, personalization, security
 └── App.jsx          # Route definitions
 ```
 
@@ -226,7 +203,7 @@ src/
 - No production authentication or GDPR-compliant data storage
 - No guaranteed sync with real store POS systems (connections are configurable but demo-oriented)
 
-All profiles, stock and floor plans are fictional and stored locally in the browser.
+Accounts, carts and inventory are stored in the browser; catalogs and floor plans come from the local API.
 
 ---
 

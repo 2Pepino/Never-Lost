@@ -20,7 +20,7 @@ function StockBadge({ status }) {
 
 export default function ProductPage() {
   const { id, pid } = useParams()
-  const { activeProfile, inCart, addToCart, removeFromCart, getProductLive, allProductsLive, productsByStoreLive } = useStore()
+  const { inCart, addToCart, removeFromCart, getProductLive, allProductsLive, productsByStoreLive } = useStore()
 
   const store = getStore(id)
   const product = getProductLive(pid)
@@ -29,8 +29,8 @@ export default function ProductPage() {
   const fullyOut = product?.stockStatus === 'out'
 
   const alternatives = useMemo(
-    () => (product && fullyOut ? rankAlternatives(product, allProductsLive, activeProfile) : []),
-    [product, fullyOut, activeProfile, allProductsLive],
+    () => (product && fullyOut ? rankAlternatives(product, allProductsLive) : []),
+    [product, fullyOut, allProductsLive],
   )
 
   const sameProductOtherStores = useMemo(
@@ -100,9 +100,7 @@ export default function ProductPage() {
             {alternatives.length > 0 && (
               <section>
                 <h2 className="mb-2 text-sm font-semibold text-slate-500">
-                  {activeProfile.type === 'guest'
-                    ? 'Similar products in this store'
-                    : 'Alternatives in this store that suit you'}
+                  Similar products in this store
                 </h2>
                 <div className="space-y-2">
                   {alternatives.map((p) => (

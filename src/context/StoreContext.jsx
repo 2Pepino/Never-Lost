@@ -1,10 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getProfile } from '../data/profiles.js'
 import { fetchCatalog, getProduct, getProducts } from '../lib/catalog.js'
 import { stores } from '../data/stores.js'
 import { getManager } from '../data/managers.js'
 import { buildInitialInventory, enrichProduct } from '../lib/inventory.js'
-import { pickBestProduct, labelForTerm } from '../lib/assistant.js'
 import { loadConnections } from '../lib/connectionsStorage.js'
 import { fetchStock, buildStockPatch } from '../lib/inventorySync.js'
 import {
@@ -15,14 +13,10 @@ import {
 } from '../lib/security.js'
 import { seedDemoAccounts } from '../lib/seedDemoAccounts.js'
 
-// A cart item is store-independent: either an ingredient term
-// (kind: 'ingredient'), or a concrete product you tapped in a store
-// (kind: 'product'). It is only resolved once a store is chosen.
+// Cart items are product ids from the catalog.
 function normalizeCartItem(entry) {
-  if (typeof entry === 'string') return { key: entry, kind: 'product' } // legacy storage
-  if (entry && entry.key && (entry.kind === 'ingredient' || entry.kind === 'product')) {
-    return { key: entry.key, kind: entry.kind }
-  }
+  if (typeof entry === 'string') return { key: entry, kind: 'product' }
+  if (entry?.key) return { key: entry.key, kind: 'product' }
   return null
 }
 
@@ -32,7 +26,6 @@ const DYNAMIC_PROFILE_KEY = 'storenav.dynamicProfile'
 const ACCOUNTS_KEY = 'storenav.accounts'
 const CART_KEY = 'storenav.cart'
 const CHECKED_OFF_KEY = 'storenav.checkedOff'
-const EDITS_KEY = 'storenav.profileEdits'
 // Legacy keys — cleared on startup; auth now uses sessionStorage sessions.
 const LEGACY_PROFILE_KEY = 'storenav.profileId'
 const LEGACY_MANAGER_KEY = 'storenav.managerId'
@@ -60,35 +53,29 @@ function loadAuthFromSession() {
   clearLegacyAuthKeys()
   const session = getSession()
   if (!session) {
-    return { profileId: null, dynamicProfile: null, managerId: null }
+    return { dynamicProfile: null, managerId: null }
   }
 
   if (session.type === 'manager') {
-    return { profileId: null, dynamicProfile: null, managerId: session.subject }
+    return { dynamicProfile: null, managerId: session.subject }
   }
 
   if (session.type === 'customer-account') {
     try {
       const dynamicProfile = JSON.parse(sessionStorage.getItem(DYNAMIC_PROFILE_KEY)) || null
       if (dynamicProfile && (dynamicProfile.id === session.subject || dynamicProfile.person?.email === session.subject)) {
-        return { profileId: null, dynamicProfile, managerId: null }
+        return { dynamicProfile, managerId: null }
       }
     } catch {
       /* corrupt profile data */
     }
     clearSession()
     sessionStorage.removeItem(DYNAMIC_PROFILE_KEY)
-    return { profileId: null, dynamicProfile: null, managerId: null }
+    return { dynamicProfile: null, managerId: null }
   }
 
   clearSession()
-  return { profileId: null, dynamicProfile: null, managerId: null }
-}
-
-// Merges the fields edited by the user with the base profile.
-function mergeProfile(base, edit) {
-  if (!base || !edit) return base
-  return applyProfilePatch(base, edit)
+  return { dynamicProfile: null, managerId: null }
 }
 
 function applyProfilePatch(base, patch) {
@@ -96,12 +83,6 @@ function applyProfilePatch(base, patch) {
   return {
     ...base,
     ...patch,
-    preferences:
-      patch.preferences !== undefined
-        ? base.preferences
-          ? { ...base.preferences, ...patch.preferences }
-          : patch.preferences
-        : base.preferences,
     person: patch.person ? { ...(base.person || {}), ...patch.person } : base.person,
   }
 }
@@ -126,7 +107,6 @@ export function StoreProvider({ children }) {
   const [catalogVersion, setCatalogVersion] = useState(0)
 
   const initialAuth = loadAuthFromSession()
-  const [profileId, setProfileId] = useState(initialAuth.profileId)
   const [dynamicProfile, setDynamicProfile] = useState(initialAuth.dynamicProfile)
   const [cartItems, setCartItems] = useState(() => {
     try {
@@ -143,13 +123,6 @@ export function StoreProvider({ children }) {
     }
   })
   const [managerId, setManagerId] = useState(initialAuth.managerId)
-  const [edits, setEdits] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(EDITS_KEY)) || {}
-    } catch {
-      return {}
-    }
-  })
   const [inventory, setInventory] = useState({})
 
   useEffect(() => {
@@ -196,17 +169,10 @@ export function StoreProvider({ children }) {
   }, [checkedOff])
 
   useEffect(() => {
-    localStorage.setItem(EDITS_KEY, JSON.stringify(edits))
-  }, [edits])
-
-  useEffect(() => {
     localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory))
   }, [inventory])
 
-  const activeProfile = useMemo(
-    () => dynamicProfile || mergeProfile(getProfile(profileId), edits[profileId]),
-    [dynamicProfile, profileId, edits],
-  )
+  const activeProfile = dynamicProfile
   const activeManager = useMemo(() => getManager(managerId), [managerId])
 
   const getStock = useCallback((productId) => inventory[productId] ?? { shelf: 0, warehouse: 0 }, [inventory])
@@ -228,8 +194,8 @@ export function StoreProvider({ children }) {
     () =>
       cartItems.map((it) => ({
         key: it.key,
-        kind: it.kind,
-        label: it.kind === 'ingredient' ? labelForTerm(it.key) : getProduct(it.key)?.name || it.key,
+        kind: 'product',
+        label: getProduct(it.key)?.name || it.key,
       })),
     [cartItems],
   )
@@ -241,13 +207,12 @@ export function StoreProvider({ children }) {
     (storeId) => {
       const pool = productsByStoreLive(storeId)
       const byId = new Map(pool.map((p) => [p.id, p]))
-      return cartItems.map((item) => {
-        const product =
-          item.kind === 'product' ? byId.get(item.key) || null : pickBestProduct(pool, item.key)
-        return { item, product }
-      })
+      return cartItems.map((item) => ({
+        item,
+        product: byId.get(item.key) || null,
+      }))
     },
-    [productsByStoreLive, activeProfile, cartItems],
+    [productsByStoreLive, cartItems],
   )
 
   // Which stores can supply (part of) the list, with coverage and price.
@@ -296,65 +261,25 @@ export function StoreProvider({ children }) {
       activeProfile,
       isLoggedIn: !!activeProfile,
       isOwnAccount: !!dynamicProfile,
-      login: (arg, sessionType) => {
-        if (typeof arg === 'string') {
-          if (!sessionType) throw new Error('login(profileId) requires a session type.')
-          setDynamicProfile(null)
-          setProfileId(arg)
-          createSession(sessionType, arg)
-        } else if (arg && typeof arg === 'object') {
-          setProfileId(null)
-          setDynamicProfile(arg)
-          const subject = (arg.person?.email || arg.id || '').toLowerCase()
-          createSession('customer-account', subject)
-        }
+      login: (profile) => {
+        setDynamicProfile(profile)
+        const subject = (profile.person?.email || profile.id || '').toLowerCase()
+        createSession('customer-account', subject)
       },
       logout: () => {
         clearSession()
         setDynamicProfile(null)
-        setProfileId(null)
       },
       cart,
       cartItems,
       cartCount: cartItems.length,
-      // Number of concrete products in the cart (excluding ingredient terms).
-      productCount: cartItems.filter((it) => it.kind === 'product').length,
+      productCount: cartItems.length,
       resolveCartForStore,
       storesForList,
       // Add/check/remove a concrete product (tapped in a store).
-      inCart: (id) => cartItems.some((it) => it.kind === 'product' && it.key === id),
+      inCart: (id) => cartItems.some((it) => it.key === id),
       addToCart: (id) =>
-        setCartItems((cur) =>
-          cur.some((it) => it.kind === 'product' && it.key === id) ? cur : [...cur, { key: id, kind: 'product' }],
-        ),
-      // Add ingredient terms from the assistant/questionnaire. Each term is
-      // immediately turned into the best matching concrete product so it also
-      // lands in the cart. No match in the assortment? Then the term stays on
-      // the list as an ingredient (nothing gets lost).
-      addIngredients: (terms) =>
-        setCartItems((cur) => {
-          const existingProducts = new Set(
-            cur.filter((it) => it.kind === 'product').map((it) => it.key),
-          )
-          const existingIngredients = new Set(
-            cur.filter((it) => it.kind === 'ingredient').map((it) => it.key),
-          )
-          const toAdd = []
-          for (const term of terms || []) {
-            if (!term) continue
-            const product = pickBestProduct(allProductsLive, term)
-            if (product) {
-              if (!existingProducts.has(product.id)) {
-                toAdd.push({ key: product.id, kind: 'product' })
-                existingProducts.add(product.id)
-              }
-            } else if (!existingIngredients.has(term)) {
-              toAdd.push({ key: term, kind: 'ingredient' })
-              existingIngredients.add(term)
-            }
-          }
-          return toAdd.length ? [...cur, ...toAdd] : cur
-        }),
+        setCartItems((cur) => (cur.some((it) => it.key === id) ? cur : [...cur, { key: id, kind: 'product' }])),
       removeFromCart: (key) => {
         setCartItems((items) => items.filter((it) => it.key !== key))
         setCheckedOff((a) => a.filter((x) => x !== key))
@@ -377,24 +302,17 @@ export function StoreProvider({ children }) {
         setManagerId(null)
       },
       updateProfile: (patch) => {
-        if (dynamicProfile) {
-          setDynamicProfile((p) => {
-            const next = applyProfilePatch(p, patch)
-            const email = (next.person?.email || next.id || '').toLowerCase()
-            if (email) {
-              const accounts = getAccounts()
-              if (accounts[email]) {
-                saveAccount(email, { ...accounts[email], profile: next })
-              }
+        setDynamicProfile((p) => {
+          if (!p) return p
+          const next = applyProfilePatch(p, patch)
+          const email = (next.person?.email || next.id || '').toLowerCase()
+          if (email) {
+            const accounts = getAccounts()
+            if (accounts[email]) {
+              saveAccount(email, { ...accounts[email], profile: next })
             }
-            return next
-          })
-          return
-        }
-        if (!profileId) return
-        setEdits((e) => {
-          const current = e[profileId] || {}
-          return { ...e, [profileId]: applyProfilePatch(current, patch) }
+          }
+          return next
         })
       },
       inventory,
@@ -413,7 +331,6 @@ export function StoreProvider({ children }) {
       resolveCartForStore,
       storesForList,
       checkedOff,
-      profileId,
       inventory,
       getStock,
       getProductLive,

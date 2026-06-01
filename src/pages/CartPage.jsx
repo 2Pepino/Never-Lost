@@ -4,8 +4,7 @@ import { useStore } from '../context/StoreContext.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import StoreLogo from '../components/StoreLogo.jsx'
 
-// The cart is your full shopping list: ingredients you added via the
-// ✨ Chef plus concrete products you tapped in a store.
+// The cart is your shopping list: products you added from stores or search.
 // At the bottom you pick a store to start the route.
 export default function CartPage() {
   const { cart, storesForList, removeFromCart, clearCart, isCheckedOff, toggleCheckedOff } = useStore()
@@ -19,9 +18,7 @@ export default function CartPage() {
           <div className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-100">
             <p className="text-5xl">🛍️</p>
             <p className="mt-3 text-slate-500">Your list is still empty.</p>
-            <p className="mt-1 text-xs text-slate-400">
-              Add products in a store or build your list via the ✨ Chef.
-            </p>
+            <p className="mt-1 text-xs text-slate-400">Add products from a store or use search below.</p>
           </div>
           <ManualAddSection />
         </div>
@@ -37,7 +34,7 @@ export default function CartPage() {
       />
 
       <div className="space-y-5 px-4 py-4">
-        {/* The full list: ingredients + concrete products, checkable. */}
+        {/* The full list: products, checkable. */}
         <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <ul className="space-y-1">
             {cart.map((it) => {

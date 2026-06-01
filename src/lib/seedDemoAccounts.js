@@ -2,7 +2,7 @@ import { getAccounts, saveAccount } from '../context/StoreContext.jsx'
 import { hashPassword } from './security.js'
 
 const DEMO_SEED_KEY = 'storenav.demoAccountsSeed'
-const DEMO_SEED_VERSION = '1'
+const DEMO_SEED_VERSION = '2'
 
 export const DEMO_EMAIL = 'demo@demo.com'
 export const DEMO_PASSWORD = 'demo'
@@ -15,19 +15,10 @@ function buildCustomerProfile() {
     description: 'Demo account',
     color: '#7c3aed',
     person: { email: DEMO_EMAIL, phone: '', address: '' },
-    preferences: {
-      diet: [],
-      priceTier: 'budget',
-      brands: [],
-      departments: [],
-    },
-    loyaltyPoints: 0,
-    cashbackBalance: 0,
-    cashbackTier: 'Standard',
   }
 }
 
-/** Ensures the shared demo login (1234@1234 / 1234) exists for customer and manager flows. */
+/** Ensures the shared demo login exists for customer and manager flows. */
 export async function seedDemoAccounts() {
   if (localStorage.getItem(DEMO_SEED_KEY) === DEMO_SEED_VERSION) return
 

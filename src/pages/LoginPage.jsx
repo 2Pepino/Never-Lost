@@ -41,7 +41,7 @@ export default function LoginPage() {
         if (isLegacyPassword(account.password)) {
           saveAccount(emailLower, { ...account, password: await hashPassword(password) })
         }
-        login(account.profile, 'customer-account')
+        login(account.profile)
         navigate('/')
         return
       }
@@ -63,8 +63,8 @@ export default function LoginPage() {
       title="Never Lost"
       subtitle={
         <>
-          Your personalized store navigator
-          <span className="mt-1 block font-medium text-brand-600">Shopping made easy, cooking made easy.</span>
+          Your store navigator
+          <span className="mt-1 block font-medium text-brand-600">Find products faster in every store.</span>
         </>
       }
       footer={

@@ -16,8 +16,8 @@ export default function ProfilePhotoPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  if (activeProfile.type === 'guest') {
-    return <Navigate to="/more" replace />
+  if (!activeProfile) {
+    return <Navigate to="/login" replace />
   }
 
   const current = activeProfile.profilePhoto

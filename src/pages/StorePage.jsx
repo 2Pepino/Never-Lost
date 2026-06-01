@@ -23,7 +23,7 @@ const catLabel = (c) => formatCategoryLabel(c)
 export default function StorePage() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
-  const { activeProfile, productCount, productsByStoreLive, resolveCartForStore } = useStore()
+  const { productCount, productsByStoreLive, resolveCartForStore } = useStore()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState(null)
   // From the cart you can open the store plan directly (?plan=1).
@@ -58,8 +58,8 @@ export default function StorePage() {
     } else if (category) {
       list = list.filter((p) => p.category === category)
     }
-    return rankProducts(list, activeProfile)
-  }, [storeProducts, search, searchActive, category, activeProfile])
+    return rankProducts(list)
+  }, [storeProducts, search, searchActive, category])
 
   if (!store) return <Navigate to="/" replace />
 
@@ -137,9 +137,6 @@ export default function StorePage() {
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-500">
                 {searchActive ? `Results for "${search}"` : `${catEmoji(category)} ${catLabel(category)}`}
-                {!searchActive && activeProfile.type !== 'guest' && (
-                  <span className="font-normal"> · for your preference</span>
-                )}
               </h2>
               {!searchActive && category && (
                 <button onClick={() => setCategory(null)} className="text-xs font-medium text-brand-600">
