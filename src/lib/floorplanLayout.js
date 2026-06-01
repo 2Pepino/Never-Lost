@@ -1,3 +1,5 @@
+import { getCategoryAisleMap, resolveAisleLocation } from './productAisle.js'
+
 /** Grid and layout for the interactive demo floor plan. */
 
 export const FULL = { x: 0, y: 0, w: 100, h: 104 }
@@ -26,12 +28,14 @@ export function truncate(name, max) {
 }
 
 export function buildLayout(products) {
+  const aisleMap = getCategoryAisleMap(products)
   const aisles = new Map()
   for (const p of products) {
-    if (!p.shelfLocation) continue
-    const key = p.shelfLocation.label
+    const loc = resolveAisleLocation(p, aisleMap)
+    if (!loc) continue
+    const key = loc.label
     if (!aisles.has(key)) {
-      aisles.set(key, { label: key, cx: p.shelfLocation.x, cy: p.shelfLocation.y, items: [] })
+      aisles.set(key, { label: key, cx: loc.x, cy: loc.y, items: [] })
     }
     aisles.get(key).items.push(p)
   }

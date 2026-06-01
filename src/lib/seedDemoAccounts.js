@@ -4,8 +4,8 @@ import { hashPassword } from './security.js'
 const DEMO_SEED_KEY = 'storenav.demoAccountsSeed'
 const DEMO_SEED_VERSION = '1'
 
-export const DEMO_EMAIL = '1234@1234'
-export const DEMO_PASSWORD = '1234'
+export const DEMO_EMAIL = 'demo@demo.com'
+export const DEMO_PASSWORD = 'demo'
 
 function buildCustomerProfile() {
   return {
@@ -27,7 +27,7 @@ function buildCustomerProfile() {
   }
 }
 
-/** Ensures the shared demo login (1234@1234 / 1234) exists for customer, staff and manager flows. */
+/** Ensures the shared demo login (1234@1234 / 1234) exists for customer and manager flows. */
 export async function seedDemoAccounts() {
   if (localStorage.getItem(DEMO_SEED_KEY) === DEMO_SEED_VERSION) return
 
@@ -41,8 +41,6 @@ export async function seedDemoAccounts() {
   saveAccount(email, {
     password,
     profile: buildCustomerProfile(),
-    role: 'staff',
-    profileId: 'staff',
     managerId: 'mgr-ah-xl',
     storeId: 'ah-xl',
   })

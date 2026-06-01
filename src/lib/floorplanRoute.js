@@ -1,4 +1,5 @@
 import { ENTRANCE_CORRIDOR_Y, EXIT, KASSA, RACK_H } from './floorplanLayout.js'
+import { getCategoryAisleMap, resolveAisleLocation } from './productAisle.js'
 import { demoRackFrontApproach } from './shelfFront.js'
 
 const AISLE_BAND = 4.5
@@ -26,10 +27,15 @@ function buildCorridorRowYs(racks) {
  */
 export function buildStoreNetwork(products, racks = []) {
   const xs = new Set()
+  const aisleMap = getCategoryAisleMap(products)
+
+  if (racks.length) {
+    for (const r of racks) xs.add(r.aisleX)
+  }
 
   for (const p of products) {
-    if (!p.shelfLocation) continue
-    xs.add(p.shelfLocation.x)
+    const loc = resolveAisleLocation(p, aisleMap)
+    if (loc) xs.add(loc.x)
   }
 
   const aisleXs = [...xs].sort((a, b) => a - b)
@@ -108,16 +114,20 @@ export function collectRackStops(products, routeProductIds) {
   const idSet = new Set(routeProductIds)
   const byRack = new Map()
 
+  const aisleMap = getCategoryAisleMap(products)
+
   for (const p of products) {
-    if (!idSet.has(p.id) || !p.shelfLocation) continue
-    const rackId = p.shelfLocation.label
+    if (!idSet.has(p.id)) continue
+    const loc = resolveAisleLocation(p, aisleMap)
+    if (!loc) continue
+    const rackId = loc.label
     if (!byRack.has(rackId)) {
       byRack.set(rackId, {
         rackId,
         label: rackId,
-        aisleX: p.shelfLocation.x,
-        cy: p.shelfLocation.y,
-        rowY: p.shelfLocation.y,
+        aisleX: loc.x,
+        cy: loc.y,
+        rowY: loc.y,
         categories: new Set(),
         products: [],
       })

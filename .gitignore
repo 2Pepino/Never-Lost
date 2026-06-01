@@ -5,6 +5,7 @@ npm-debug.log*
 
 # Dependencies
 node_modules
+server/data/db.json
 .tools
 dist
 dist-ssr

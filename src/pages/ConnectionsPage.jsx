@@ -238,7 +238,7 @@ export default function ConnectionsPage() {
               a list with per product a <code className="text-brand-600">sku</code> (= product id),{' '}
               <code className="text-brand-600">warehouse</code> and{' '}
               <code className="text-brand-600">shelves</code>. Syncing updates the live
-              inventory (visible in the catalog and staff dashboard).
+              inventory (visible in the catalog).
             </p>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

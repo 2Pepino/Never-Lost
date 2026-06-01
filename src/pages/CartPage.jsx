@@ -164,7 +164,7 @@ export default function CartPage() {
 }
 
 // Lets the customer search the assortment and manually add products to the
-// list. We search across all stores by name, brand and category.
+// list. We search across all stores by name and category.
 function ManualAddSection() {
   const { allProductsLive, addToCart, inCart } = useStore()
   const [search, setSearch] = useState('')
@@ -174,7 +174,7 @@ function ManualAddSection() {
     if (!term) return []
     return allProductsLive
       .filter((p) => !inCart(p.id))
-      .filter((p) => [p.name, p.brand, p.category].some((v) => v?.toLowerCase().includes(term)))
+      .filter((p) => [p.name, p.category].some((v) => v?.toLowerCase().includes(term)))
       .slice(0, 6)
   }, [search, allProductsLive, inCart])
 
@@ -214,9 +214,7 @@ function ManualAddSection() {
                 >
                   <span className="flex-1">
                     <span className="block text-sm font-medium text-slate-800">{p.name}</span>
-                    <span className="block text-xs text-slate-400">
-                      {p.brand} · € {p.price.toFixed(2)}
-                    </span>
+                    <span className="block text-xs text-slate-400">€ {p.price.toFixed(2)}</span>
                   </span>
                   <span className="shrink-0 text-lg font-semibold text-brand-600">＋</span>
                 </button>

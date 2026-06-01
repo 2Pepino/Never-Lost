@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useStore } from '../context/StoreContext.jsx'
+import { formatCategoryLabel } from '../lib/productCategories.js'
 
 function stockLabel(product) {
-  if (product.stockStatus === 'warehouse') return 'Ask staff to fetch it'
+  if (product.stockStatus === 'warehouse') return 'In warehouse only'
   if (product.stockStatus === 'out') return 'Out of stock'
   return null
 }
@@ -29,7 +30,7 @@ export default function ProductRow({ product }) {
             )}
           </span>
           <span className="block text-xs text-slate-500">
-            {product.brand} · € {product.price.toFixed(2)} · {product.shelfLocation?.label}
+            {formatCategoryLabel(product.category)} · € {product.price.toFixed(2)}
           </span>
           {product._warning && (
             <span className="mt-0.5 block text-[11px] text-amber-600">⚠ {product._warning}</span>

@@ -1,10 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getProfile } from '../data/profiles.js'
-import { getProduct, products } from '../data/products.js'
+import { fetchCatalog, getProduct, getProducts } from '../lib/catalog.js'
 import { stores } from '../data/stores.js'
 import { getManager } from '../data/managers.js'
 import { buildInitialInventory, enrichProduct } from '../lib/inventory.js'
-import { isQualifiedStaff } from '../lib/staffAccess.js'
 import { pickBestProduct, labelForTerm } from '../lib/assistant.js'
 import { loadConnections } from '../lib/connectionsStorage.js'
 import { fetchStock, buildStockPatch } from '../lib/inventorySync.js'
@@ -13,7 +12,6 @@ import {
   createSession,
   getSession,
   isManagerSession,
-  isStaffSession,
 } from '../lib/security.js'
 import { seedDemoAccounts } from '../lib/seedDemoAccounts.js'
 
@@ -40,9 +38,7 @@ const LEGACY_PROFILE_KEY = 'storenav.profileId'
 const LEGACY_MANAGER_KEY = 'storenav.managerId'
 const INVENTORY_KEY = 'storenav.inventory'
 const INVENTORY_SEED_KEY = 'storenav.inventorySeed'
-const INVENTORY_SEED_VERSION = '4'
-const STAFF_LOG_KEY = 'storenav.staffLog'
-
+const INVENTORY_SEED_VERSION = '6'
 export function getAccounts() {
   try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)) || {} }
   catch { return {} }
@@ -69,10 +65,6 @@ function loadAuthFromSession() {
 
   if (session.type === 'manager') {
     return { profileId: null, dynamicProfile: null, managerId: session.subject }
-  }
-
-  if (session.type === 'staff') {
-    return { profileId: session.subject, dynamicProfile: null, managerId: null }
   }
 
   if (session.type === 'customer-account') {
@@ -114,7 +106,7 @@ function applyProfilePatch(base, patch) {
   }
 }
 
-function loadInventory() {
+function loadInventory(catalogProducts) {
   try {
     const seed = localStorage.getItem(INVENTORY_SEED_KEY)
     const saved = JSON.parse(localStorage.getItem(INVENTORY_KEY))
@@ -122,21 +114,17 @@ function loadInventory() {
   } catch {
     /* ignore corrupt data */
   }
-  const inv = buildInitialInventory(products)
+  const inv = buildInitialInventory(catalogProducts)
   localStorage.setItem(INVENTORY_SEED_KEY, INVENTORY_SEED_VERSION)
   localStorage.setItem(INVENTORY_KEY, JSON.stringify(inv))
   return inv
 }
 
-function loadStaffLog() {
-  try {
-    return JSON.parse(localStorage.getItem(STAFF_LOG_KEY)) || []
-  } catch {
-    return []
-  }
-}
-
 export function StoreProvider({ children }) {
+  const [catalogReady, setCatalogReady] = useState(false)
+  const [catalogError, setCatalogError] = useState(null)
+  const [catalogVersion, setCatalogVersion] = useState(0)
+
   const initialAuth = loadAuthFromSession()
   const [profileId, setProfileId] = useState(initialAuth.profileId)
   const [dynamicProfile, setDynamicProfile] = useState(initialAuth.dynamicProfile)
@@ -162,8 +150,26 @@ export function StoreProvider({ children }) {
       return {}
     }
   })
-  const [inventory, setInventory] = useState(loadInventory)
-  const [staffLog, setStaffLog] = useState(loadStaffLog)
+  const [inventory, setInventory] = useState({})
+
+  useEffect(() => {
+    let cancelled = false
+    fetchCatalog()
+      .then(() => {
+        if (cancelled) return
+        setCatalogVersion((v) => v + 1)
+        setInventory(loadInventory(getProducts()))
+        setCatalogReady(true)
+      })
+      .catch((e) => {
+        if (!cancelled) setCatalogError(e.message || 'Could not load catalog.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const productList = useMemo(() => getProducts(), [catalogVersion])
 
   // Always keep the latest inventory at hand without rebuilding the sync callback
   // on every stock change.
@@ -197,30 +203,25 @@ export function StoreProvider({ children }) {
     localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory))
   }, [inventory])
 
-  useEffect(() => {
-    localStorage.setItem(STAFF_LOG_KEY, JSON.stringify(staffLog.slice(0, 50)))
-  }, [staffLog])
-
   const activeProfile = useMemo(
     () => dynamicProfile || mergeProfile(getProfile(profileId), edits[profileId]),
     [dynamicProfile, profileId, edits],
   )
   const activeManager = useMemo(() => getManager(managerId), [managerId])
-  const qualifiedStaff = useMemo(
-    () => isQualifiedStaff(activeProfile) && isStaffSession(),
-    [activeProfile],
-  )
 
-  const getStock = useCallback((productId) => inventory[productId] ?? { warehouse: 0, shelves: 0 }, [inventory])
+  const getStock = useCallback((productId) => inventory[productId] ?? { shelf: 0, warehouse: 0 }, [inventory])
 
   const getProductLive = useCallback((id) => enrichProduct(getProduct(id), getStock(id)), [getStock])
 
   const productsByStoreLive = useCallback(
-    (storeId) => products.filter((p) => p.storeId === storeId).map((p) => enrichProduct(p, getStock(p.id))),
-    [getStock],
+    (storeId) => productList.filter((p) => p.storeId === storeId).map((p) => enrichProduct(p, getStock(p.id))),
+    [getStock, productList],
   )
 
-  const allProductsLive = useMemo(() => products.map((p) => enrichProduct(p, getStock(p.id))), [getStock])
+  const allProductsLive = useMemo(
+    () => productList.map((p) => enrichProduct(p, getStock(p.id))),
+    [getStock, productList],
+  )
 
   // The visible (store-independent) list: each item with a readable label.
   const cart = useMemo(
@@ -242,7 +243,7 @@ export function StoreProvider({ children }) {
       const byId = new Map(pool.map((p) => [p.id, p]))
       return cartItems.map((item) => {
         const product =
-          item.kind === 'product' ? byId.get(item.key) || null : pickBestProduct(pool, item.key, activeProfile)
+          item.kind === 'product' ? byId.get(item.key) || null : pickBestProduct(pool, item.key)
         return { item, product }
       })
     },
@@ -265,12 +266,6 @@ export function StoreProvider({ children }) {
       .sort((a, b) => b.count - a.count || a.totalPrice - b.totalPrice)
   }, [cartItems, resolveCartForStore])
 
-  const logStaffAction = useCallback((text) => {
-    setStaffLog((log) =>
-      [{ id: Date.now(), text, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }, ...log].slice(0, 50),
-    )
-  }, [])
-
   // Pulls the current stock from a store's database via a configured API
   // connection and applies it to the live inventory. Without a connectionId the
   // store's first active connection is used.
@@ -282,83 +277,18 @@ export function StoreProvider({ children }) {
 
       try {
         const rows = await fetchStock(connection, storeId)
-        const storeProducts = products.filter((p) => p.storeId === storeId)
+        const storeProducts = productList.filter((p) => p.storeId === storeId)
         const { patch, recognized, changed } = buildStockPatch(rows, storeProducts, inventoryRef.current)
         if (recognized === 0) {
           return { ok: false, error: 'No recognizable products in the API response.' }
         }
         setInventory((inv) => ({ ...inv, ...patch }))
-        logStaffAction(
-          `Stock synced via "${connection.name}" — ${recognized} products (${changed} updated)`,
-        )
         return { ok: true, recognized, changed, total: storeProducts.length }
       } catch (e) {
         return { ok: false, error: e.message || 'Synchronization failed.' }
       }
     },
-    [logStaffAction],
-  )
-
-  const moveToShelves = useCallback(
-    (productId, quantity = 1) => {
-      const stock = getStock(productId)
-      const product = getProduct(productId)
-      if (!product || quantity < 1) return { ok: false, error: 'Invalid product or quantity.' }
-      if (stock.warehouse < quantity) {
-        return { ok: false, error: `Not enough in the warehouse (${stock.warehouse} left).` }
-      }
-
-      setInventory((inv) => ({
-        ...inv,
-        [productId]: { warehouse: stock.warehouse - quantity, shelves: stock.shelves + quantity },
-      }))
-      logStaffAction(`${quantity}× ${product.name} → shelves (warehouse −${quantity})`)
-      return { ok: true }
-    },
-    [getStock, logStaffAction],
-  )
-
-  const sellFromShelves = useCallback(
-    (productId, quantity = 1) => {
-      const stock = getStock(productId)
-      const product = getProduct(productId)
-      if (!product || quantity < 1) return { ok: false, error: 'Invalid product or quantity.' }
-      if (stock.shelves < quantity) {
-        return { ok: false, error: `Not enough on the shelves (${stock.shelves} left).` }
-      }
-
-      setInventory((inv) => ({
-        ...inv,
-        [productId]: { warehouse: stock.warehouse, shelves: stock.shelves - quantity },
-      }))
-      logStaffAction(`${quantity}× ${product.name} sold (shelves −${quantity})`)
-      return { ok: true }
-    },
-    [getStock, logStaffAction],
-  )
-
-  // Checkout happens in one chosen store: resolve the list against that store
-  // and deduct the found products from the shelves.
-  const checkoutCart = useCallback(
-    (storeId) => {
-      const resolved = resolveCartForStore(storeId)
-      const toSell = [...new Set(resolved.filter((r) => r.product).map((r) => r.product.id))]
-      const errors = []
-      for (const id of toSell) {
-        const result = sellFromShelves(id, 1)
-        if (!result.ok) {
-          const p = getProduct(id)
-          errors.push(p ? `${p.name}: ${result.error}` : result.error)
-        }
-      }
-      if (errors.length === 0) {
-        setCartItems([])
-        setCheckedOff([])
-        return { ok: true }
-      }
-      return { ok: false, error: errors.join(' · ') }
-    },
-    [resolveCartForStore, sellFromShelves],
+    [productList],
   )
 
   const value = useMemo(
@@ -366,7 +296,6 @@ export function StoreProvider({ children }) {
       activeProfile,
       isLoggedIn: !!activeProfile,
       isOwnAccount: !!dynamicProfile,
-      isQualifiedStaff: qualifiedStaff,
       login: (arg, sessionType) => {
         if (typeof arg === 'string') {
           if (!sessionType) throw new Error('login(profileId) requires a session type.')
@@ -413,7 +342,7 @@ export function StoreProvider({ children }) {
           const toAdd = []
           for (const term of terms || []) {
             if (!term) continue
-            const product = pickBestProduct(allProductsLive, term, activeProfile)
+            const product = pickBestProduct(allProductsLive, term)
             if (product) {
               if (!existingProducts.has(product.id)) {
                 toAdd.push({ key: product.id, kind: 'product' })
@@ -468,22 +397,17 @@ export function StoreProvider({ children }) {
           return { ...e, [profileId]: applyProfilePatch(current, patch) }
         })
       },
-      checkoutCart,
       inventory,
       getStock,
       getProductLive,
       productsByStoreLive,
       allProductsLive,
-      moveToShelves,
-      sellFromShelves,
       syncStockFromConnection,
-      staffLog,
     }),
     [
       activeProfile,
       dynamicProfile,
       activeManager,
-      qualifiedStaff,
       cart,
       cartItems,
       resolveCartForStore,
@@ -495,13 +419,32 @@ export function StoreProvider({ children }) {
       getProductLive,
       productsByStoreLive,
       allProductsLive,
-      moveToShelves,
-      sellFromShelves,
-      checkoutCart,
       syncStockFromConnection,
-      staffLog,
     ],
   )
+
+  if (catalogError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface p-6 text-center">
+        <div className="max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-rose-200">
+          <p className="text-lg font-semibold text-slate-800">Cannot reach the server</p>
+          <p className="mt-2 text-sm text-slate-600">{catalogError}</p>
+          <p className="mt-3 text-xs text-slate-500">
+            Start the API with <code className="text-brand-600">npm run dev:server</code> (or{' '}
+            <code className="text-brand-600">npm run dev</code> for both).
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!catalogReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <p className="text-sm font-medium text-slate-600">Loading store catalog…</p>
+      </div>
+    )
+  }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

@@ -1,6 +1,6 @@
 # Never Lost
 
-A mobile-first web app that helps shoppers find products in physical stores. Build a list, pick a store, and follow an optimized route on a 2D floor plan. The app personalizes search results and alternatives based on your profile, and includes separate flows for store staff and managers.
+A mobile-first web app that helps shoppers find products in physical stores. Build a list, pick a store, and follow an optimized route on a 2D floor plan. The app personalizes search results and alternatives based on your profile, and includes a manager flow for building store floor plans.
 
 **Demo:** [https://github.com/2Pepino/Never-Lost](https://github.com/2Pepino/Never-Lost)
 
@@ -8,15 +8,14 @@ A mobile-first web app that helps shoppers find products in physical stores. Bui
 
 ## What it does
 
-Never Lost connects three roles in one app:
+Never Lost connects two roles in one app:
 
 | Role | Route | Purpose |
 |------|-------|---------|
 | **Customer** | `/` (login required) | Shopping list, store browse, floor plan navigation |
-| **Staff** | `/staff` | Restock shelves, process sales at checkout |
 | **Manager** | `/manage` | Edit floor plans, view catalog, connect external APIs |
 
-Everything runs in the browser with seed data in `localStorage` — no backend server.
+Product catalogs and floor plans are stored on a small **Node.js API** (JSON file database). Customer sessions, carts and profile edits still use the browser (`localStorage`).
 
 ---
 
@@ -87,19 +86,6 @@ Managers assign each shelf a **product category** label (e.g. pasta, bread) so r
 
 ---
 
-## Staff experience
-
-Login at `/staff/login` (separate from customer login).
-
-| Page | What it does |
-|------|----------------|
-| **Dashboard** (`/staff`) | View stock by shelf: empty shelves, low stock, well stocked. Move quantity from warehouse to shelves. |
-| **Checkout** (`/staff/checkout`) | Scan a product QR/barcode or search, then register a sale (deducts shelf stock). |
-
-Staff accounts are tied to one store.
-
----
-
 ## Manager experience
 
 Login at `/manage/login`.
@@ -149,13 +135,14 @@ Product assortments differ per store (groceries, electronics, sport, toys, etc.)
 | Layer | Choice |
 |-------|--------|
 | Frontend | React 19 + Vite 6 |
+| Backend | Express API + JSON file store (`server/`) |
 | Routing | React Router 7 |
 | Styling | Tailwind CSS 4 |
-| State | React Context + `localStorage` |
+| State | React Context + API for catalog/floor plans |
 | Floor plan | SVG + custom A* pathfinding / aisle graph |
 | Security | Client-side password hashing, login lockout (`src/lib/security.js`) |
 
-No backend, database or external map tiles. One optional dependency on custom API URLs configured by managers.
+Each store has **10 categories** (`cat1`–`cat10`) with **20 products** each (200 per store). Product IDs are **UUIDs**. Store **names** are fixed in `src/data/stores.js`.
 
 ---
 
@@ -174,13 +161,27 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**
+Open **http://localhost:5173** (Vite proxies `/api` to the backend on port **3001**).
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | Development server with hot reload |
+| `npm run dev` | Frontend + API together |
+| `npm run dev:client` | Vite only (needs API running separately) |
+| `npm run dev:server` | API only (`http://localhost:3001`) |
 | `npm run build` | Production build in `dist/` |
 | `npm run preview` | Preview the production build locally |
+
+### API (development)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/catalog` | Catalog split per store (`stores[storeId].categories` + `products`) |
+| `GET` | `/api/stores/:storeId/catalog` | One store catalog |
+| `GET` | `/api/stores/:storeId/products` | Products for one store |
+| `GET` | `/api/stores/:storeId/floorplan` | Saved floor plan |
+| `PUT` | `/api/stores/:storeId/floorplan` | Save floor plan `{ elements: [...] }` |
+
+Data file: `server/data/db.json` (created on first run).
 
 **Windows (PowerShell)** — if `npm` is not on your PATH:
 
@@ -197,10 +198,10 @@ On first load a shared demo account is seeded:
 
 | Field | Value |
 |-------|-------|
-| Email | `1234@1234` |
-| Password | `1234` |
+| Email | `demo@demo` |
+| Password | `demo` |
 
-This account can access customer, staff and manager flows depending on how you log in. Create your own account via **Sign up** on the login page.
+This account can access customer and manager flows depending on how you log in. Create your own account via **Sign up** on the login page.
 
 ---
 
@@ -208,7 +209,7 @@ This account can access customer, staff and manager flows depending on how you l
 
 ```
 src/
-├── pages/           # Customer, staff and manager screens
+├── pages/           # Customer and manager screens
 ├── components/      # UI, floor plan renderer, editor palette
 ├── context/         # Global app state (profiles, cart, stock)
 ├── data/            # Stores, products, profiles, floor plan types

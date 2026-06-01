@@ -45,32 +45,20 @@ export default function ProductPage() {
   const inWarehouse = product.stockStatus === 'warehouse'
   return (
     <div>
-      <PageHeader title={product.name} subtitle={`${product.brand} · ${store.name}`} back />
+      <PageHeader title={product.name} subtitle={store.name} back />
 
       <div className="space-y-4 px-4 py-4">
         <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-2xl font-bold text-slate-800">€ {product.price.toFixed(2)}</p>
-              <p className="text-sm text-slate-500">{product.shelfLocation?.label}</p>
             </div>
             <StockBadge status={product.stockStatus} />
           </div>
 
           {inWarehouse && (
             <div className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              This product isn't on the shelves, but there's still stock in the warehouse. Ask a staff member to fetch
-              it for you.
-            </div>
-          )}
-
-          {product.diet.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1">
-              {product.diet.map((d) => (
-                <span key={d} className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-600">
-                  {d}
-                </span>
-              ))}
+              This product isn't on the shelves yet, but there's still stock in the warehouse.
             </div>
           )}
 
@@ -93,7 +81,6 @@ export default function ProductPage() {
               storeId={store.id}
               products={productsByStoreLive(id)}
               highlightId={product.id}
-              highlight={product.shelfLocation}
             />
           </div>
         )}

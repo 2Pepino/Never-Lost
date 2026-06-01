@@ -21,23 +21,39 @@ export default function FloorplanEditorPage() {
   const [saved, setSaved] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [snapEnabled, setSnapEnabled] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const loadedRef = useRef(false)
 
   useEffect(() => {
-    if (!store || loadedRef.current) return
-    const stored = loadFloorplan(store.id)
-    setElements((stored?.elements || []).map(normalizeElement))
-    loadedRef.current = true
+    if (!store) return
+    let cancelled = false
+    loadedRef.current = false
+    setLoadError('')
+    loadFloorplan(store.id)
+      .then((stored) => {
+        if (cancelled) return
+        setElements((stored?.elements || []).map(normalizeElement))
+        loadedRef.current = true
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError('Could not load the floor plan from the server.')
+      })
+    return () => {
+      cancelled = true
+    }
   }, [store])
 
   useEffect(() => {
     if (!store || !loadedRef.current) return
-    const result = saveFloorplan(store.id, elements)
-    if (result) {
-      setSaved(true)
-      const t = setTimeout(() => setSaved(false), 1500)
-      return () => clearTimeout(t)
-    }
+    const timer = setTimeout(() => {
+      saveFloorplan(store.id, elements)
+        .then(() => {
+          setSaved(true)
+          setTimeout(() => setSaved(false), 1500)
+        })
+        .catch(() => setLoadError('Could not save the floor plan.'))
+    }, 400)
+    return () => clearTimeout(timer)
   }, [store, elements])
 
   useEffect(() => {
@@ -114,8 +130,7 @@ export default function FloorplanEditorPage() {
           </>
         }
         onLogout={() => {
-          saveFloorplan(store.id, elements)
-          managerLogout()
+          void saveFloorplan(store.id, elements).finally(() => managerLogout())
         }}
       >
         {selected && getFloorplanType(selected.type)?.rotatable && (
@@ -144,6 +159,12 @@ export default function FloorplanEditorPage() {
           Preview
         </button>
       </ManagerHeader>
+
+      {loadError && (
+        <p className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-center text-sm text-rose-700">
+          {loadError}
+        </p>
+      )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <ElementPalette />
@@ -179,7 +200,7 @@ export default function FloorplanEditorPage() {
               This is how customers see your floor plan (mobile)
             </p>
             <p className="mb-3 text-center text-[11px] text-slate-400">
-              Give each shelf a category from your assortment (e.g. pasta, bread) so routes are correct.
+              Give each shelf a category from your assortment (e.g. cat1, cat2) so routes are correct.
             </p>
             <FloorplanRenderer
               elements={elements}

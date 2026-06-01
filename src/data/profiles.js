@@ -38,18 +38,6 @@ export const profiles = [
     cashbackTier: 'Standard',
   },
   {
-    id: 'staff',
-    name: 'Demo',
-    type: 'staff',
-    description: 'Shelf stocker · Delhaize',
-    color: '#059669',
-    staffStoreId: 'delhaize',
-    preferences: null,
-    loyaltyPoints: 0,
-    cashbackBalance: 0,
-    cashbackTier: 'Staff',
-  },
-  {
     id: 'guest',
     name: 'Guest',
     type: 'guest',

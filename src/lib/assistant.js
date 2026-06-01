@@ -254,30 +254,15 @@ export function ingredientsForDishes(recipes) {
   return { terms, notFound: [...notFound] }
 }
 
-// Pick the best matching product for one ingredient term from a given pool
-// (e.g. the products of one store), preferring the diet and price tier of the
-// profile. Returns null if the term is not in the pool.
-export function pickBestProduct(pool, term, profile) {
+// Pick the best matching product for one ingredient term from a given pool.
+export function pickBestProduct(pool, term) {
   const matches = fuzzySearchProducts(pool || [], term)
   if (!matches.length) return null
 
-  const diet = profile?.preferences?.diet || []
-  const priceTier = profile?.preferences?.priceTier
-
-  let candidates = matches
-  if (diet.length) {
-    const withDiet = matches.filter((p) => diet.every((d) => p.diet.includes(d)))
-    if (withDiet.length) candidates = withDiet // only filter if there is an alternative
-  }
-
-  return [...candidates].sort((a, b) => {
-    // Products on the shelf first (otherwise you can't grab them right now).
+  return [...matches].sort((a, b) => {
     const as = a.onShelf === false ? 1 : 0
     const bs = b.onShelf === false ? 1 : 0
     if (as !== bs) return as - bs
-    const am = a.priceTier === priceTier ? 0 : 1
-    const bm = b.priceTier === priceTier ? 0 : 1
-    if (am !== bm) return am - bm
     return a.price - b.price
   })[0]
 }

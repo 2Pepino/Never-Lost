@@ -1,23 +1,14 @@
-// Simulated store database. Returns a store's stock in the shape a real
-// ERP/POS-system API would (a list of rows with a SKU and the warehouse/shelf
-// stock). inventorySync uses this as the source when a connection is marked as
-// a "demo data source", so the full sync flow works without an external server.
-//
-// The values come from products.js — the source of truth — so a sync resets the
-// live (drifted) stock to what the store database says.
+export async function mockStoreDatabaseResponse(storeId) {
+  const res = await fetch(`/api/stores/${encodeURIComponent(storeId)}/products`)
+  if (!res.ok) throw new Error(`Demo database unavailable (${res.status})`)
+  const { products } = await res.json()
 
-import { products } from '../data/products.js'
-
-// Builds the API payload for a single store.
-export function mockStoreDatabaseResponse(storeId) {
-  const inventory = products
-    .filter((p) => p.storeId === storeId)
-    .map((p) => ({
-      sku: p.id,
-      name: p.name,
-      warehouse: p.warehouseStock ?? 0,
-      shelves: p.shelfStock ?? 0,
-    }))
+  const inventory = products.map((p) => ({
+    sku: p.id,
+    name: p.name,
+    warehouse: p.stock?.warehouse ?? 0,
+    shelves: p.stock?.shelf ?? 0,
+  }))
 
   return {
     store: storeId,
@@ -28,10 +19,10 @@ export function mockStoreDatabaseResponse(storeId) {
   }
 }
 
-// Simulates a network call with a small delay so the UI can show a real loading
-// state.
 export function fetchMockStoreDatabase(storeId) {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(mockStoreDatabaseResponse(storeId)), 400)
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      mockStoreDatabaseResponse(storeId).then(resolve).catch(reject)
+    }, 400)
   })
 }

@@ -52,7 +52,9 @@ export default function StorePage() {
     let list = storeProducts
     if (searchActive) {
       const q = search.toLowerCase()
-      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q))
+      list = list.filter(
+        (p) => p.name.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q),
+      )
     } else if (category) {
       list = list.filter((p) => p.category === category)
     }

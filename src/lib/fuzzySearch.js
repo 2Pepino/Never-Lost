@@ -52,7 +52,7 @@ export function fuzzySearchProducts(products, query) {
 
   return products
     .map((p) => {
-      const fields = [p.name, p.brand, p.category, p.shelfLocation?.label, p.id?.replace(/^p-/, '').replace(/-/g, ' ')]
+      const fields = [p.name, p.category, p.id?.replace(/^[^-]+-/, '').replace(/-/g, ' ')]
       const score = Math.max(...fields.filter(Boolean).map((v) => scoreText(v, q)))
       return { product: p, score }
     })

@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FLOORPLAN_CHANGE_EVENT, loadFloorplan } from './floorplanStorage.js'
-
-function readPlan(storeId) {
-  if (!storeId) return { elements: [], hasPlan: false }
-  const plan = loadFloorplan(storeId)
-  const elements = plan?.elements ?? []
-  return { elements, hasPlan: elements.length > 0 }
-}
+import { FLOORPLAN_CHANGE_EVENT, getCachedFloorplan, loadFloorplan } from './floorplanStorage.js'
 
 export function useFloorplan(storeId) {
-  const [data, setData] = useState(() => readPlan(storeId))
+  const [data, setData] = useState(() => {
+    const cached = storeId ? getCachedFloorplan(storeId) : null
+    const elements = cached?.elements ?? []
+    return { elements, hasPlan: elements.length > 0, loading: !cached && !!storeId }
+  })
 
-  const refresh = useCallback(() => {
-    setData(readPlan(storeId))
+  const refresh = useCallback(async () => {
+    if (!storeId) {
+      setData({ elements: [], hasPlan: false, loading: false })
+      return
+    }
+    setData((prev) => ({ ...prev, loading: true }))
+    const plan = await loadFloorplan(storeId)
+    const elements = plan?.elements ?? []
+    setData({ elements, hasPlan: elements.length > 0, loading: false })
   }, [storeId])
 
   useEffect(() => {
@@ -25,11 +29,7 @@ export function useFloorplan(storeId) {
       if (!changedId || changedId === storeId) refresh()
     }
     window.addEventListener(FLOORPLAN_CHANGE_EVENT, onChange)
-    window.addEventListener('storage', onChange)
-    return () => {
-      window.removeEventListener(FLOORPLAN_CHANGE_EVENT, onChange)
-      window.removeEventListener('storage', onChange)
-    }
+    return () => window.removeEventListener(FLOORPLAN_CHANGE_EVENT, onChange)
   }, [storeId, refresh])
 
   return data

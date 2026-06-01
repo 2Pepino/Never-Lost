@@ -68,14 +68,9 @@ export default function LoginPage() {
         </>
       }
       footer={
-        <span className="space-x-3">
-          <Link to="/staff/login" className="underline underline-offset-2 transition hover:text-brand-600">
-            Staff login
-          </Link>
-          <Link to="/manage/login" className="underline underline-offset-2 transition hover:text-brand-600">
-            Store manager login
-          </Link>
-        </span>
+        <Link to="/manage/login" className="underline underline-offset-2 transition hover:text-brand-600">
+          Store manager login
+        </Link>
       }
     >
       {/* Tabs */}

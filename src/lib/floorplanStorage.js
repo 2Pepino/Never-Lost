@@ -1,40 +1,62 @@
 import { normalizeElement } from './floorplanGeometry.js'
 
-const PREFIX = 'storenav.floorplan.'
 export const FLOORPLAN_CHANGE_EVENT = 'storenav-floorplan-change'
 
-export function loadFloorplan(storeId) {
-  if (!storeId) return null
-  try {
-    const raw = localStorage.getItem(PREFIX + storeId)
-    if (!raw) return null
-    const data = JSON.parse(raw)
-    if (!data?.elements || !Array.isArray(data.elements)) return null
-    return {
-      ...data,
-      elements: data.elements.map(normalizeElement),
-    }
-  } catch {
-    return null
+const cache = new Map()
+
+function normalizePlan(data) {
+  if (!data?.elements || !Array.isArray(data.elements)) {
+    return { storeId: data?.storeId, elements: [], updatedAt: data?.updatedAt ?? null }
+  }
+  return {
+    ...data,
+    elements: data.elements.map(normalizeElement),
   }
 }
 
-export function saveFloorplan(storeId, elements) {
-  const existing = loadFloorplan(storeId)
-  const serialized = JSON.stringify(elements)
-  if (existing && JSON.stringify(existing.elements) === serialized) {
-    return existing
+export function getCachedFloorplan(storeId) {
+  return cache.get(storeId) ?? null
+}
+
+export async function loadFloorplan(storeId) {
+  if (!storeId) return null
+  if (cache.has(storeId)) return cache.get(storeId)
+
+  try {
+    const res = await fetch(`/api/stores/${encodeURIComponent(storeId)}/floorplan`)
+    if (!res.ok) throw new Error(`Floor plan request failed (${res.status})`)
+    const data = normalizePlan(await res.json())
+    cache.set(storeId, data)
+    return data
+  } catch {
+    return { storeId, elements: [], updatedAt: null }
   }
-  const data = { storeId, elements, updatedAt: new Date().toISOString() }
-  localStorage.setItem(PREFIX + storeId, JSON.stringify(data))
+}
+
+export async function saveFloorplan(storeId, elements) {
+  const serialized = JSON.stringify(elements)
+  const cached = cache.get(storeId)
+  if (cached && JSON.stringify(cached.elements) === serialized) {
+    return cached
+  }
+
+  const res = await fetch(`/api/stores/${encodeURIComponent(storeId)}/floorplan`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ elements }),
+  })
+  if (!res.ok) throw new Error(`Could not save floor plan (${res.status})`)
+
+  const data = normalizePlan(await res.json())
+  cache.set(storeId, data)
   window.dispatchEvent(
     new CustomEvent(FLOORPLAN_CHANGE_EVENT, { detail: { storeId } }),
   )
   return data
 }
 
-export function getEntrancePosition(storeId, fallback = { x: 50, y: 96 }) {
-  const plan = loadFloorplan(storeId)
+export async function getEntrancePosition(storeId, fallback = { x: 50, y: 96 }) {
+  const plan = await loadFloorplan(storeId)
   if (!plan) return fallback
   const entrance = plan.elements.find((el) => el.type === 'entrance')
   return entrance ? { x: entrance.x, y: entrance.y } : fallback

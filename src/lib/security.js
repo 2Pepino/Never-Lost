@@ -75,7 +75,7 @@ export function isLegacyPassword(stored) {
 }
 
 // ── Session management (sessionStorage — not persistent across browser rest) ─
-/** @typedef {'customer-account' | 'staff' | 'manager'} SessionType */
+/** @typedef {'customer-account' | 'manager'} SessionType */
 
 export function createSession(type, subject) {
   const session = {
@@ -118,10 +118,6 @@ export function sessionMatches(type, subject = null) {
   if (!session || session.type !== type) return false
   if (subject !== null && session.subject !== subject) return false
   return true
-}
-
-export function isStaffSession() {
-  return sessionMatches('staff', 'staff')
 }
 
 export function isManagerSession() {

@@ -20,12 +20,17 @@ export function normalizeStockResponse(data) {
     .map((row) => {
       const sku = row.sku ?? row.id ?? row.productId ?? row.productCode
       if (!sku) return null
-      const warehouse = Number(row.warehouse ?? row.warehouseStock ?? row.stockWarehouse ?? 0)
-      const shelves = Number(row.shelves ?? row.shelf ?? row.shelfStock ?? row.stockShelves ?? 0)
+      const stock = row.stock && typeof row.stock === 'object' ? row.stock : null
+      const warehouse = Number(
+        stock?.warehouse ?? row.warehouse ?? row.warehouseStock ?? row.stockWarehouse ?? 0,
+      )
+      const shelf = Number(
+        stock?.shelf ?? row.shelves ?? row.shelf ?? row.shelfStock ?? row.stockShelves ?? 0,
+      )
       return {
         sku: String(sku),
         warehouse: Number.isFinite(warehouse) ? Math.max(0, Math.round(warehouse)) : 0,
-        shelves: Number.isFinite(shelves) ? Math.max(0, Math.round(shelves)) : 0,
+        shelf: Number.isFinite(shelf) ? Math.max(0, Math.round(shelf)) : 0,
       }
     })
     .filter(Boolean)
@@ -72,7 +77,7 @@ export async function fetchStock(connection, storeId) {
   return normalizeStockResponse(data)
 }
 
-// Builds the inventory patch { [productId]: { warehouse, shelves } } from the
+// Builds the inventory patch { [productId]: { warehouse, shelf } } from the
 // fetched rows, limited to products this store actually carries. `current`
 // (optional) lets us count how many products actually change.
 export function buildStockPatch(rows, storeProducts, current = {}) {
@@ -82,9 +87,10 @@ export function buildStockPatch(rows, storeProducts, current = {}) {
 
   for (const row of rows) {
     if (!exists.has(row.sku)) continue
-    patch[row.sku] = { warehouse: row.warehouse, shelves: row.shelves }
+    patch[row.sku] = { warehouse: row.warehouse, shelf: row.shelf }
     const old = current[row.sku]
-    if (!old || old.warehouse !== row.warehouse || old.shelves !== row.shelves) changed += 1
+    const prevShelf = old?.shelf ?? old?.shelves ?? 0
+    if (!old || old.warehouse !== row.warehouse || prevShelf !== row.shelf) changed += 1
   }
 
   return { patch, recognized: Object.keys(patch).length, changed }

@@ -1,4 +1,4 @@
-// Shared light shell for all login/onboarding screens, so customer, staff and
+// Shared light shell for all login/onboarding screens (customer and manager).
 // manager login look identical (violet brand accent).
 // `logo` = icon/emblem at the top, `title`/`subtitle` = heading, `footer` = links
 // at the bottom (e.g. "back to customer login"). `wide` for the wider signup flow.

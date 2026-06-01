@@ -16,8 +16,8 @@ export default function AlternativeCard({ product, otherStore = false }) {
       <div className="flex-1">
         <p className="font-medium text-slate-800">{product.name}</p>
         <p className="text-xs text-slate-500">
-          {product.brand} · € {product.price.toFixed(2)}
-          {otherStore && store ? ` · ${store.name}` : ` · ${product.shelfLocation?.label}`}
+          € {product.price.toFixed(2)}
+          {otherStore && store ? ` · ${store.name}` : ''}
         </p>
         <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
           {otherStore && store ? `Available at ${store.name}` : product._reason}
